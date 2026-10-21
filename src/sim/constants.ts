@@ -13,7 +13,7 @@ export const STARTING_GOLD = 500;
 export const PASSIVE_GOLD_PER_SEC = 2.7;
 
 /** XP needed to go from `level` to `level + 1`. */
-export const xpToNextLevel = (level: number): number => 220 + 95 * (level - 1);
+export const xpToNextLevel = (level: number): number => 200 + 88 * (level - 1);
 
 /** Radius inside which a kill or a minion death shares XP with nearby allies. */
 export const XP_SHARE_RADIUS = 1400;

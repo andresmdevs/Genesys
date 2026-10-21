@@ -30,8 +30,22 @@ export interface CastContext {
   memory: Record<string, number>;
 }
 
+/**
+ * How a bot should think about an ability. Kept on the definition so adding a
+ * champion teaches the AI to play it without touching the AI.
+ */
+export type BotUse =
+  | 'damage' // throw at an enemy champion in range
+  | 'engage' // commit onto a target, usually a dash or a hook
+  | 'escape' // get out, aimed away from danger
+  | 'buff' // self buff, worth pressing when a fight starts
+  | 'support' // heal or shield, aimed at the ally who needs it most
+  | 'zone'; // ground area, good on a clump or on a wave
+
 export interface AbilityDef {
   key: AbilityKey;
+  /** Defaults to 'damage' for offensive targeting, 'buff' for self-cast. */
+  botUse?: BotUse;
   name: string;
   /** Shown in the ability tooltip; may contain plain text only. */
   description: string;

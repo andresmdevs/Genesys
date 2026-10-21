@@ -78,6 +78,8 @@ import { stepMinions, stepMonsters, stepTowers } from './npc.ts';
 import { cooldownMultiplier, recomputeStats } from './stats.ts';
 import { acquireChampionTarget, structureIsShielded } from './targeting.ts';
 import { runBotTick } from './bots/controller.ts';
+// Registers the bot controller; imported for the side effect only.
+import './bots/brain.ts';
 import type { Command } from './commands.ts';
 import type { AbilityKey, MinionKind, Unit } from './types.ts';
 import { World } from './world.ts';
@@ -408,7 +410,8 @@ export class Match {
     return true;
   }
 
-  private castFlash(unit: Unit, point: Vec2): void {
+  /** Public so the bot controller can use it without re-entering `step`. */
+  castFlash(unit: Unit, point: Vec2): void {
     const champ = unit.champion!;
     if (champ.flashCooldown > 0 || !canCastSpells(unit)) return;
     const d = dist(unit.pos, point);
@@ -436,7 +439,8 @@ export class Match {
     settleIntoTerrain(unit);
   }
 
-  private castHeal(unit: Unit): void {
+  /** Public so the bot controller can use it without re-entering `step`. */
+  castHeal(unit: Unit): void {
     const champ = unit.champion!;
     if (champ.healCooldown > 0) return;
     champ.healCooldown = HEAL_COOLDOWN;
@@ -695,8 +699,8 @@ export class Match {
   }
 
   private rewardMinion(victim: Unit, killer: Unit | undefined): void {
-    const gold: Record<MinionKind, number> = { melee: 21, caster: 14, siege: 62, super: 60 };
-    const xp: Record<MinionKind, number> = { melee: 60, caster: 32, siege: 95, super: 110 };
+    const gold: Record<MinionKind, number> = { melee: 23, caster: 16, siege: 62, super: 60 };
+    const xp: Record<MinionKind, number> = { melee: 68, caster: 42, siege: 112, super: 125 };
     const kind = victim.minion!.kind;
 
     if (killer?.champion) {

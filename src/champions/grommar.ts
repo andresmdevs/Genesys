@@ -67,6 +67,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'engage',
       name: 'Garra de cadena',
       description:
         'Lanza una cadena: el primer enemigo alcanzado recibe daño y es arrastrado hacia Grommar.',
@@ -111,6 +112,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'buff',
       name: 'Piel de roca',
       description: 'Se escuda durante 3 s y gana armadura y resistencia mágica.',
       targeting: 'self',
@@ -133,6 +135,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'damage',
       name: 'Golpe sísmico',
       description: 'Golpea el suelo lanzando por los aires a los enemigos muy cercanos.',
       targeting: 'self',
@@ -154,6 +157,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'engage',
       name: 'Carga imparable',
       description:
         'Carga hacia delante. El primer campeón enemigo que golpee recibe daño y queda aturdido.',

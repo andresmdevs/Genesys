@@ -48,6 +48,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Lanza de hielo',
       description: 'Dispara una lanza que atraviesa a todos los enemigos en línea recta.',
       targeting: 'direction',
@@ -83,6 +84,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'zone',
       name: 'Campo gélido',
       description:
         'Cubre una zona de escarcha durante 4 s que causa daño y ralentiza a quien la pise.',
@@ -115,6 +117,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'support',
       name: 'Barrera de hielo',
       description: 'Escuda a un aliado durante 3 s. Puede lanzarse sobre sí misma.',
       targeting: 'ally',
@@ -130,6 +133,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'zone',
       name: 'Invierno eterno',
       description:
         'Tras 0,75 s, congela una gran zona: daño mágico y enraizamiento a todos los enemigos alcanzados.',

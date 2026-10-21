@@ -64,6 +64,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Tajo sísmico',
       description:
         'Barre un cono frente a él causando daño físico y ralentizando un 30 % durante 1,5 s.',
@@ -98,6 +99,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'buff',
       name: 'Muro de escoria',
       description:
         'Se cubre con un escudo durante 3 s y gana tenacidad mientras dure.',
@@ -117,6 +119,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'engage',
       name: 'Embestida',
       description:
         'Carga hacia delante, causando daño y empujando por los aires a los enemigos alcanzados.',
@@ -159,6 +162,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'buff',
       name: 'Fragua de guerra',
       description:
         'Durante 7 s reduce el daño recibido y golpea cada 0,5 s a los enemigos cercanos con daño mágico.',

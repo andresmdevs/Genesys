@@ -59,6 +59,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Disparo perforante',
       description: 'Dispara una flecha que atraviesa a todos los enemigos en línea.',
       targeting: 'direction',
@@ -93,6 +94,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'buff',
       name: 'Ráfaga',
       description: 'Durante 4 s gana velocidad de ataque y de movimiento.',
       targeting: 'self',
@@ -117,6 +119,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'escape',
       name: 'Reposición',
       description: 'Da un salto corto en la dirección indicada.',
       targeting: 'point',
@@ -131,6 +134,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'damage',
       name: 'Tiro de precisión',
       description:
         'Un disparo de largo alcance que atraviesa y causa un daño físico devastador.',

@@ -49,6 +49,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Bola de fuego',
       description: 'Lanza una bola que estalla al impactar causando daño en área.',
       targeting: 'direction',
@@ -80,6 +81,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'zone',
       name: 'Muro de llamas',
       description:
         'Levanta una línea de fuego durante 4 s que quema a los enemigos que la cruzan.',
@@ -116,6 +118,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'escape',
       name: 'Fulgor',
       description: 'Se desplaza rápidamente y quema a los enemigos cercanos al llegar.',
       targeting: 'point',
@@ -151,6 +154,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'zone',
       name: 'Meteoro',
       description:
         'Invoca un meteoro que cae tras 1,2 s causando un daño enorme en un área amplia.',

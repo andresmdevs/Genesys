@@ -64,6 +64,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'engage',
       name: 'Estocada',
       description: 'Atraviesa al objetivo causando daño físico y queda al otro lado.',
       targeting: 'enemy',
@@ -102,6 +103,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'escape',
       name: 'Velo de sombras',
       description:
         'Se vuelve invisible durante 1,25 s y gana velocidad de movimiento.',
@@ -125,6 +127,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'damage',
       name: 'Marca mortal',
       description:
         'Marca a un enemigo durante 5 s. La siguiente habilidad de Vael sobre él detona la marca causando daño adicional.',
@@ -149,6 +152,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'damage',
       name: 'Juicio',
       description:
         'Golpe devastador a un solo objetivo. Si lo elimina, Estocada y Velo de sombras se reinician.',

@@ -53,6 +53,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Dardo corrosivo',
       description:
         'Lanza un dardo que atraviesa enemigos, causa daño mágico y aplica dos acumulaciones de corrosión.',
@@ -95,6 +96,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'zone',
       name: 'Velo de niebla',
       description:
         'Crea una nube durante 4 s: los aliados en su interior quedan ocultos y los enemigos son ralentizados.',
@@ -132,6 +134,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'engage',
       name: 'Parpadeo umbrío',
       description: 'Se desplaza una corta distancia y aplica corrosión a los enemigos cercanos al llegar.',
       targeting: 'point',
@@ -165,6 +168,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'zone',
       name: 'Colapso',
       description:
         'Detona la corrosión de todos los enemigos cercanos: daño mágico por cada acumulación consumida.',

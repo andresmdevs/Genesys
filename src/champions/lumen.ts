@@ -54,6 +54,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Rayo de luz',
       description: 'Proyecta un haz que daña al primer enemigo alcanzado.',
       targeting: 'direction',
@@ -86,6 +87,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'support',
       name: 'Bendición',
       description: 'Cura a un aliado y le concede velocidad de movimiento durante 2 s.',
       targeting: 'ally',
@@ -110,6 +112,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'support',
       name: 'Égida',
       description: 'Escuda a un aliado durante 3 s.',
       targeting: 'ally',
@@ -125,6 +128,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'buff',
       name: 'Amanecer',
       description:
         'Cura a todos los aliados cercanos, los escuda y elimina las ralentizaciones que sufran.',

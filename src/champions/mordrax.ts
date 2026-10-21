@@ -50,6 +50,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Desgarro',
       description:
         'Desgarra al objetivo causando daño físico inmediato y una hemorragia durante 4 s.',
@@ -79,6 +80,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'buff',
       name: 'Frenesí',
       description:
         'Durante 5 s gana velocidad de ataque y robo de vida adicional.',
@@ -105,6 +107,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'engage',
       name: 'Salto depredador',
       description: 'Salta a la posición indicada causando daño al aterrizar.',
       targeting: 'point',
@@ -139,6 +142,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'damage',
       name: 'Ejecución carmesí',
       description:
         'Daño que aumenta con la vida que le falta al objetivo. Se cura por una parte del daño causado.',

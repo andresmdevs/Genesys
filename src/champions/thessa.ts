@@ -59,6 +59,7 @@ export default registerChampion({
   abilities: {
     Q: {
       key: 'Q',
+      botUse: 'damage',
       name: 'Flecha larga',
       description: 'Dispara una flecha de muy largo alcance que atraviesa a todos los enemigos.',
       targeting: 'direction',
@@ -93,6 +94,7 @@ export default registerChampion({
 
     W: {
       key: 'W',
+      botUse: 'zone',
       name: 'Trampa de bruma',
       description:
         'Coloca una trampa que permanece 45 s. Al activarse enraíza y ralentiza a los enemigos cercanos.',
@@ -136,6 +138,7 @@ export default registerChampion({
 
     E: {
       key: 'E',
+      botUse: 'escape',
       name: 'Salto atrás',
       description: 'Retrocede de un salto alejándose del punto indicado.',
       targeting: 'point',
@@ -155,6 +158,7 @@ export default registerChampion({
 
     R: {
       key: 'R',
+      botUse: 'damage',
       name: 'Disparo del ocaso',
       description:
         'Un proyectil de alcance enorme cuyo daño aumenta cuanto más lejos viaja.',

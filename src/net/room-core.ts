@@ -130,6 +130,9 @@ export class RoomCore {
           if (other !== seat && other.joined && other.slot === slot) return;
         }
         seat.slot = slot;
+        // Tell the asker which seat is now theirs; without this their lobby
+        // keeps highlighting the one they were first given.
+        this.transport.send(peerId, { t: 'welcome', slot, version: PROTOCOL_VERSION });
         this.broadcastLobby();
         break;
       }

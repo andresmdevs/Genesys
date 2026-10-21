@@ -31,9 +31,12 @@ async function joinAs(name) {
 
   const inputs = page.locator('input');
   await inputs.nth(0).fill(name);
-  await inputs.nth(1).fill(SERVER);
-  await page.getByRole('button', { name: 'Conectar' }).click();
-  await page.waitForSelector('text=SALA', { timeout: 10000 });
+  // The dedicated-server form sits behind a disclosure, since room codes are
+  // the path most players take.
+  await page.locator('summary', { hasText: 'servidor dedicado' }).click();
+  await inputs.nth(2).fill(SERVER);
+  await page.getByRole('button', { name: 'Conectar al servidor' }).click();
+  await page.waitForSelector('.seat-board', { timeout: 15000 });
   return page;
 }
 

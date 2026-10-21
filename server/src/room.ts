@@ -123,6 +123,9 @@ export class Room {
           if (other !== session && other.joined && other.slot === slot) return;
         }
         session.slot = slot;
+        // Tell the asker which seat is now theirs; without this their lobby
+        // keeps highlighting the one they were first given.
+        this.send(session, { t: 'welcome', slot, version: PROTOCOL_VERSION });
         this.broadcastLobby();
         break;
       }

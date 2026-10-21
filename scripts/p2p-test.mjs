@@ -79,6 +79,14 @@ await guest.locator('.champ-card', { hasText: 'Ysolde' }).click();
 await host.waitForTimeout(500);
 await guest.screenshot({ path: `${OUT}/2-guest-lobby.png` });
 
+// The lobby must agree with the seat that was actually taken.
+const guestSays = (await guest.locator('.detail p').first().textContent()).trim();
+console.log(`el invitado cree estar en: ${guestSays}`);
+const seatOk = guestSays.includes('azul') && guestSays.includes('Central');
+if (!seatOk) {
+  console.error(`FAIL: la sala muestra un puesto equivocado para el invitado: ${guestSays}`);
+}
+
 await host.getByRole('button', { name: 'Listo', exact: true }).click();
 await guest.getByRole('button', { name: 'Listo', exact: true }).click();
 
@@ -127,7 +135,7 @@ const seated = await host.evaluate(() =>
 console.log(`tick anfitrión=${fa.tick} invitado=${fb.tick}`);
 console.log(`humanos: ${seated.join(' | ')}`);
 
-let failed = false;
+let failed = !seatOk;
 if (fa.tick !== fb.tick) {
   console.error('FAIL: los clientes no convergieron al mismo tick');
   failed = true;

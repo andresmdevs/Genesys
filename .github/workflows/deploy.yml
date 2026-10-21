@@ -1,21 +1,22 @@
-name: Deploy to GitHub Pages
+name: Publish to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # The repository's default branch is the development branch for now.
+    branches:
+      - main
+      - claude/peaceful-babbage-grobkj
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,19 +24,31 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
       - run: npm ci
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # Pages serves the gh-pages branch, so the build output is pushed there
+      # rather than through the Pages deployment API. Nothing to enable, and it
+      # is free on a public repository.
+      - name: Publish dist to gh-pages
+        run: |
+          set -euo pipefail
+          # Stops Pages from hiding files that begin with an underscore.
+          touch dist/.nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages --depth=1 || true
+          git worktree add --detach ../pages origin/gh-pages 2>/dev/null \
+            || git worktree add --orphan -b gh-pages ../pages
+          cd ../pages
+          git checkout -B gh-pages
+          git rm -r --quiet . 2>/dev/null || true
+          cp -r "$GITHUB_WORKSPACE/dist/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "El sitio publicado ya está al día."
+          else
+            git commit -m "Publish the built site"
+            git push origin gh-pages
+          fi

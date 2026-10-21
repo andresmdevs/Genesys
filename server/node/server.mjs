@@ -88,6 +88,19 @@ class Room {
         this.broadcastLobby();
         break;
       }
+      case 'seat': {
+        if (this.started) return;
+        const slot = Number(msg.slot);
+        if (!Number.isInteger(slot) || slot < 0 || slot >= MAX_PLAYERS) return;
+        // A seat somebody already holds stays theirs.
+        for (const other of this.sessions) {
+          if (other !== session && other.joined && other.slot === slot) return;
+        }
+        session.slot = slot;
+        this.broadcastLobby();
+        break;
+      }
+
       case 'pick':
         if (this.started) return;
         session.championId = String(msg.championId ?? '').slice(0, 40) || null;

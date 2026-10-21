@@ -1,5 +1,6 @@
 import type { Vec2 } from '../core/math.ts';
 import type { LaneId, Team } from '../data/map.ts';
+import type { Position } from './positions.ts';
 
 export const NEUTRAL = 2;
 /** Jungle monsters belong to no team; `Team` stays 0/1 for players. */
@@ -183,6 +184,8 @@ export interface ChampionState {
   /** Slot in the match: 0..4 blue, 5..9 red. */
   playerSlot: number;
   isBot: boolean;
+  /** Where this champion plays. The lane is derived from it. */
+  position: Position;
   lane: LaneId;
 
   gold: number;

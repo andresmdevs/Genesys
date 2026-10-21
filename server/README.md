@@ -1,5 +1,13 @@
 # Servidor de salas de Genesys
 
+**Casi nadie necesita esto.** El juego trae partidas por código de sala: un
+navegador hace de anfitrión y los demás se conectan directamente a él, sin
+cuenta y sin desplegar nada. Este servidor es para cuando eso no basta:
+
+- redes que bloquean las conexiones directas entre pares;
+- partidas públicas donde la gente no se conoce;
+- que la sala siga viva aunque el anfitrión cierre la pestaña.
+
 Empareja jugadores y retransmite órdenes. **No simula la partida**: los
 clientes llevan simulaciones deterministas idénticas y el servidor solo decide
 qué órdenes van en qué tick. Por eso ocupa poco más de doscientas líneas y
@@ -9,12 +17,14 @@ Qué hace:
 
 1. Acepta hasta diez jugadores en una sala y reparte los puestos alternando
    equipos, para que se llenen parejos.
-2. Espera cinco minutos. Si todos los presentes marcan *listo* antes, empieza
+2. Cada jugador toma el puesto que quiera: equipo azul o rojo y posición
+   (superior, jungla, central, tirador o soporte).
+3. Espera cinco minutos. Si todos los presentes marcan *listo* antes, empieza
    ya.
-3. Al arrancar envía la semilla y quién eligió qué. **Los puestos vacíos los
+4. Al arrancar envía la semilla y quién eligió qué. **Los puestos vacíos los
    ocupan bots**, que cada cliente genera a partir de esa misma semilla.
-4. Retransmite un paquete de órdenes por tick, treinta veces por segundo.
-5. Si alguien se desconecta, avisa del tick exacto en que su campeón pasa a
+5. Retransmite un paquete de órdenes por tick, treinta veces por segundo.
+6. Si alguien se desconecta, avisa del tick exacto en que su campeón pasa a
    manos de la IA, de modo que todos los clientes lo hagan a la vez.
 
 Las órdenes se sellan con el puesto de quien las envía, así que un cliente no
@@ -48,9 +58,17 @@ Para fijarla en la compilación y que nadie tenga que escribirla:
 VITE_GENESYS_SERVER=wss://genesys-rooms.<tu-cuenta>.workers.dev/ws npm run build
 ```
 
-Nota: el reloj de la partida usa `setInterval` dentro del Durable Object, que
-sigue vivo mientras haya sockets abiertos. Cuando se va el último jugador, el
-reloj se detiene y la sala desaparece.
+Notas sobre el plan gratuito:
+
+- La migración declara `new_sqlite_classes`, que es la única clase de Durable
+  Object que admite el plan gratuito. Si lo cambias a `new_classes` el
+  despliegue fallará por facturación.
+- El reloj de la partida usa `setInterval` dentro del Durable Object, que sigue
+  vivo mientras haya sockets abiertos. Cuando se va el último jugador, el reloj
+  se detiene y la sala desaparece.
+- El plan gratuito da unas 100.000 peticiones y 13.000 GB·s diarios de Durable
+  Objects, de sobra para partidas entre amigos. Confirma las cifras vigentes en
+  la página de precios de Cloudflare antes de contar con ellas.
 
 ## Opción B: Node, en tu propia máquina
 
@@ -80,8 +98,6 @@ gente. Para jugar con amigos, compartid un nombre de sala propio.
 
 ## Límites conocidos
 
-- Los puestos se reparten alternando equipos, así que dos amigos que entren
-  seguidos caen en bandos contrarios. Falta un sistema de grupo.
 - Un cliente muy lento retrasa a los demás: es la contrapartida del lockstep.
   El juego muestra «Esperando a la red…» mientras ocurre.
 - No hay reconexión: si te caes, tu campeón lo llevan los bots hasta el final.

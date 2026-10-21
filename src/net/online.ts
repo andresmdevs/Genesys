@@ -10,8 +10,16 @@
 import { CHAMPIONS, championsByRole, getChampion } from '../champions/index.ts';
 import type { ChampionDef } from '../champions/types.ts';
 import { ROLES, ROLE_NAMES, type ChampionRole } from '../sim/types.ts';
+import {
+  POSITIONS,
+  POSITION_NAMES,
+  POSITION_SHORT,
+  positionOfSlot,
+  slotFor,
+} from '../sim/positions.ts';
 import type { SlotConfig } from '../sim/match.ts';
-import { NetClient } from './client.ts';
+import { NetClient, type RoomLink } from './client.ts';
+import { PeerGuest, PeerHost, makeRoomCode, normaliseCode } from './p2p.ts';
 import type { LobbyPlayer, Pick } from './protocol.ts';
 import { buildOnlineRoster } from './roster.ts';
 
@@ -28,7 +36,7 @@ export interface OnlineHooks {
     seed: number,
     slots: SlotConfig[],
     slot: number,
-    net: NetClient,
+    net: RoomLink,
   ): void;
 }
 
@@ -63,7 +71,8 @@ export function onlineScreen(parent: HTMLElement, hooks: OnlineHooks): HTMLEleme
   const screen = el('div', 'screen');
   parent.appendChild(screen);
 
-  let net: NetClient | null = null;
+  let net: RoomLink | null = null;
+  let hostedCode = '';
   let champion: ChampionDef = CHAMPIONS[0];
   let ready = false;
 
@@ -77,19 +86,25 @@ export function onlineScreen(parent: HTMLElement, hooks: OnlineHooks): HTMLEleme
     hooks.onCancel();
   };
 
-  /* -- Step 1: where to connect ---------------------------------- */
+  /* -- Step 1: how to meet the other players ---------------------- */
 
   const showConnect = (error?: string): void => {
     screen.replaceChildren();
-    screen.append(el('h2', 'title', 'PARTIDA ONLINE'));
+    screen.append(el('h2', 'title', 'JUGAR ONLINE'));
     screen.append(
       el(
         'p',
         'subtitle',
-        'Introduce la dirección de tu servidor de salas. Si no tienes uno, en server/README.md ' +
-          'está cómo desplegarlo gratis en unos minutos.',
+        'Crea una sala y pasa el código a quien quieras. Los puestos que nadie ocupe ' +
+          'los jugarán bots, así que una partida siempre sale.',
       ),
     );
+
+    if (error) {
+      const warn = el('p', '', error);
+      warn.style.cssText = 'color:var(--danger);font-size:13px;margin:0;max-width:560px';
+      screen.append(warn);
+    }
 
     const form = el('div', 'panel detail');
     const nameInput = el('input');
@@ -97,110 +112,255 @@ export function onlineScreen(parent: HTMLElement, hooks: OnlineHooks): HTMLEleme
     nameInput.placeholder = 'Tu nombre';
     nameInput.value = read(STORAGE_NAME, 'Jugador');
     nameInput.maxLength = 20;
+    styleInput(nameInput);
+    form.append(el('div', 'role-label', 'Nombre'), nameInput);
+
+    const rememberName = (): string => {
+      const name = nameInput.value.trim() || 'Jugador';
+      write(STORAGE_NAME, name);
+      return name;
+    };
+
+    // Create a room: this browser hosts and relays for everyone else.
+    const createRow = el('div', 'menu-actions');
+    const createButton = el('button', 'primary', 'Crear sala');
+    createButton.addEventListener('click', () => hostRoom(rememberName()));
+    createRow.append(createButton);
+    form.append(el('div', 'role-label', 'Partida con amigos'), createRow);
+
+    // Join a room by code.
+    const codeInput = el('input');
+    codeInput.type = 'text';
+    codeInput.placeholder = 'Código de la sala, por ejemplo K7PQR';
+    codeInput.maxLength = 8;
+    codeInput.style.textTransform = 'uppercase';
+    styleInput(codeInput);
+    const joinRow = el('div', 'menu-actions');
+    const joinButton = el('button', '', 'Unirse');
+    const tryJoin = (): void => {
+      const code = normaliseCode(codeInput.value);
+      if (code.length < 4) {
+        showConnect('Ese código no parece válido.');
+        return;
+      }
+      joinRoom(code, rememberName());
+    };
+    joinButton.addEventListener('click', tryJoin);
+    codeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') tryJoin();
+    });
+    joinRow.append(joinButton);
+    form.append(codeInput, joinRow);
+
+    // Dedicated server, for anyone who deployed one.
+    const serverDetails = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = 'Usar un servidor dedicado';
+    summary.style.cssText = 'cursor:pointer;color:var(--dim);font-size:12.5px;margin-top:4px';
+    serverDetails.append(summary);
 
     const urlInput = el('input');
     urlInput.type = 'text';
-    urlInput.placeholder = 'wss://genesys-rooms.tu-cuenta.workers.dev/ws';
+    urlInput.placeholder = 'wss://mi-servidor.workers.dev/ws';
     urlInput.value = read(STORAGE_URL, DEFAULT_URL);
-
-    for (const input of [nameInput, urlInput]) {
-      input.style.cssText =
-        'padding:10px 12px;border-radius:8px;border:1px solid var(--edge);' +
-        'background:rgba(10,16,28,.9);color:var(--text);font:inherit;width:100%';
-    }
-
-    form.append(el('div', 'role-label', 'Nombre'), nameInput);
-    form.append(el('div', 'role-label', 'Servidor'), urlInput);
-    if (error) {
-      const warn = el('p', '', error);
-      warn.style.color = 'var(--danger)';
-      warn.style.fontSize = '13px';
-      warn.style.margin = '0';
-      form.append(warn);
-    }
-
-    const row = el('div', 'menu-actions');
-    const connect = el('button', 'primary', 'Conectar');
-    const back = el('button', '', 'Volver');
-    back.addEventListener('click', leave);
-    row.append(connect, back);
-    form.append(row);
-    screen.append(form);
-
-    const go = (): void => {
+    styleInput(urlInput);
+    urlInput.style.marginTop = '8px';
+    const serverRow = el('div', 'menu-actions');
+    const serverButton = el('button', '', 'Conectar al servidor');
+    serverButton.addEventListener('click', () => {
       const url = urlInput.value.trim();
-      const name = nameInput.value.trim() || 'Jugador';
       if (!url) {
         showConnect('Hace falta la dirección del servidor.');
         return;
       }
       write(STORAGE_URL, url);
-      write(STORAGE_NAME, name);
-      startConnecting(url, name);
-    };
-
-    connect.addEventListener('click', go);
-    urlInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') go();
+      connectToServer(url, rememberName());
     });
+    serverRow.append(serverButton);
+    serverDetails.append(urlInput, serverRow);
+    serverDetails.append(
+      el(
+        'p',
+        'ability-text',
+        'Más fiable en redes restrictivas. Las instrucciones para desplegar uno gratis ' +
+          'están en server/README.md del repositorio.',
+      ),
+    );
+    form.append(serverDetails);
+
+    const back = el('button', '', 'Volver');
+    back.addEventListener('click', leave);
+    const backRow = el('div', 'menu-actions');
+    backRow.append(back);
+    form.append(backRow);
+
+    screen.append(form);
   };
 
-  /* -- Step 2: connect ------------------------------------------- */
+  const styleInput = (input: HTMLInputElement): void => {
+    input.style.cssText =
+      'padding:10px 12px;border-radius:8px;border:1px solid var(--edge);' +
+      'background:rgba(10,16,28,.9);color:var(--text);font:inherit;width:100%';
+  };
 
-  const startConnecting = (url: string, name: string): void => {
+  const waitingScreen = (title: string, detail: string): void => {
     screen.replaceChildren();
-    screen.append(el('h2', 'title', 'CONECTANDO'));
-    screen.append(el('p', 'subtitle', 'Buscando el servidor de salas…'));
+    screen.append(el('h2', 'title', title));
+    screen.append(el('p', 'subtitle', detail));
+    const back = el('button', '', 'Cancelar');
+    back.addEventListener('click', leave);
+    screen.append(back);
+  };
 
-    net = new NetClient(url, {
+  const attachHandlers = (link: RoomLink): void => {
+    link.handlers = {
       onLobby: (players, secondsLeft) => showLobby(players, secondsLeft),
       onStart: (seed, picks, slot) => beginMatch(seed, picks, slot),
-      onTick: () => {
-        // Bundles that arrive before the match screen exists are impossible:
-        // the driver is installed synchronously in `beginMatch`.
-      },
+      onTick: () => {},
+      onDropped: () => {},
+      onClosed: (reason) => showConnect(`Se perdió la conexión: ${reason}`),
+      onError: (message) => showConnect(message),
+    };
+  };
+
+  const hostRoom = (name: string): void => {
+    waitingScreen('CREANDO SALA', 'Registrando el código…');
+    const code = makeRoomCode();
+    const host = new PeerHost(code);
+    net = host;
+    hostedCode = code;
+    attachHandlers(host);
+    host
+      .open(name)
+      .then(() => host.pick(champion.id))
+      .catch((err: Error) => {
+        net = null;
+        showConnect(err.message);
+      });
+  };
+
+  const joinRoom = (code: string, name: string): void => {
+    waitingScreen('UNIÉNDOSE', `Buscando la sala ${code}…`);
+    const guest = new PeerGuest(code);
+    net = guest;
+    hostedCode = '';
+    attachHandlers(guest);
+    guest
+      .connect(name)
+      .then(() => guest.pick(champion.id))
+      .catch((err: Error) => {
+        net = null;
+        showConnect(err.message);
+      });
+  };
+
+  /* -- Step 2: dedicated server ----------------------------------- */
+
+  const connectToServer = (url: string, name: string): void => {
+    waitingScreen('CONECTANDO', 'Buscando el servidor de salas…');
+    const client = new NetClient(url, {
+      onLobby: (players, secondsLeft) => showLobby(players, secondsLeft),
+      onStart: (seed, picks, slot) => beginMatch(seed, picks, slot),
+      onTick: () => {},
       onDropped: () => {},
       onClosed: (reason) => showConnect(`Se perdió la conexión: ${reason}`),
       onError: (message) => showConnect(message),
     });
-
-    net.connect(name)
-      .then(() => {
-        net?.pick(champion.id);
-      })
+    net = client;
+    hostedCode = '';
+    client
+      .connect(name)
+      .then(() => client.pick(champion.id))
       .catch((err: Error) => {
+        net = null;
         showConnect(
-          `${err.message} Comprueba que la dirección empieza por wss:// y que el servidor está desplegado.`,
+          `${err.message} Comprueba que la dirección empieza por wss:// y que el servidor está activo.`,
         );
       });
   };
 
-  /* -- Step 3: lobby and champion select ------------------------- */
+  /* -- Step 3: lobby, seat and champion select -------------------- */
 
   const showLobby = (players: LobbyPlayer[], secondsLeft: number): void => {
     screen.replaceChildren();
     screen.append(el('h2', 'title', 'SALA'));
 
     const humans = players.length;
+    const mySlot = net?.slot ?? -1;
     screen.append(
       el(
         'p',
         'subtitle',
         humans >= 10
           ? 'Sala completa. Marcad listos para empezar.'
-          : `${humans} de 10 jugadores. Si no se llena, los puestos libres los ocuparán bots ` +
-            `en ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}.`,
+          : `${humans} de 10 jugadores. Elige equipo y posición; los puestos libres los ` +
+            `ocuparán bots en ${Math.floor(secondsLeft / 60)}:` +
+            `${String(secondsLeft % 60).padStart(2, '0')}. Pulsad listos para empezar antes.`,
       ),
     );
 
+    if (hostedCode) {
+      const share = el('div', 'room-code panel');
+      share.append(el('span', 'room-code-label', 'Código de la sala'));
+      share.append(el('span', 'room-code-value', hostedCode));
+      const copy = el('button', '', 'Copiar');
+      copy.addEventListener('click', () => {
+        void navigator.clipboard?.writeText(hostedCode).then(
+          () => (copy.textContent = '¡Copiado!'),
+          () => (copy.textContent = hostedCode),
+        );
+      });
+      share.append(copy);
+      screen.append(share);
+    }
+
     const wrap = el('div', 'select-wrap');
+    const left = el('div', 'roster');
 
-    // Champion picker, grouped by role like the offline screen.
-    const roster = el('div', 'roster');
+    // Seat grid: two teams by five positions. Clicking a free seat claims it,
+    // which is how a player chooses both side and role in one gesture.
+    const board = el('div', 'seat-board panel');
+    const bySlot = new Map(players.map((p) => [p.slot, p]));
+
+    for (const team of [0, 1] as const) {
+      const column = el('div', 'seat-col');
+      column.append(
+        el('div', `seat-head ${team === 0 ? 'blue' : 'red'}`, team === 0 ? 'Equipo azul' : 'Equipo rojo'),
+      );
+      for (const position of POSITIONS) {
+        const slot = slotFor(team, position);
+        const occupant = bySlot.get(slot);
+        const seat = el('button', `seat ${team === 0 ? 'blue' : 'red'}`);
+        if (slot === mySlot) seat.classList.add('mine');
+        if (occupant && slot !== mySlot) seat.classList.add('taken');
+
+        seat.append(el('span', 'seat-pos', POSITION_SHORT[position]));
+        const who = occupant
+          ? `${occupant.name}${slot === mySlot ? ' (tú)' : ''}`
+          : 'Libre · lo tomará un bot';
+        seat.append(el('span', 'seat-who', who));
+        const champName = occupant?.championId
+          ? (getChampion(occupant.championId)?.name ?? '—')
+          : '';
+        seat.append(el('span', 'seat-champ', occupant ? (champName || 'eligiendo…') : ''));
+        if (occupant?.ready) seat.classList.add('ready');
+
+        seat.title = POSITION_NAMES[position];
+        seat.disabled = Boolean(occupant) && slot !== mySlot;
+        seat.addEventListener('click', () => {
+          if (slot === mySlot) return;
+          net?.claimSeat(slot);
+        });
+        column.append(seat);
+      }
+      board.append(column);
+    }
+    left.append(board);
+
+    // Champion picker.
     const takenByOthers = new Set(
-      players.filter((p) => p.slot !== net?.slot && p.championId).map((p) => p.championId!),
+      players.filter((p) => p.slot !== mySlot && p.championId).map((p) => p.championId!),
     );
-
     for (const role of ROLES) {
       const section = el('div', 'role-row');
       section.append(el('div', 'role-label', ROLE_NAMES[role as ChampionRole]));
@@ -223,22 +383,25 @@ export function onlineScreen(parent: HTMLElement, hooks: OnlineHooks): HTMLEleme
         grid.append(card);
       }
       section.append(grid);
-      roster.append(section);
+      left.append(section);
     }
 
-    // Roster panel.
+    // Side panel: your choice and the ready control.
     const side = el('div', 'detail panel');
-    side.append(el('h3', '', 'Jugadores'));
-    for (const p of players) {
-      const row = el('div', 'ability-row');
-      const tag = el('div', 'ability-key', p.slot < 5 ? 'A' : 'R');
-      const body = el('div');
-      body.append(el('div', 'ability-name', `${p.name}${p.slot === net?.slot ? ' (tú)' : ''}`));
-      const champName = p.championId ? (getChampion(p.championId)?.name ?? '—') : 'eligiendo…';
-      body.append(el('div', 'ability-text', `${champName}${p.ready ? ' · listo' : ''}`));
-      row.append(tag, body);
-      side.append(row);
-    }
+    side.append(el('h3', '', 'Tu elección'));
+    const seatText =
+      mySlot >= 0
+        ? `${mySlot < 5 ? 'Equipo azul' : 'Equipo rojo'} · ${POSITION_NAMES[positionOfSlot(mySlot)]}`
+        : 'Sin puesto todavía';
+    side.append(el('p', '', `${champion.name} — ${seatText}`));
+    side.append(
+      el(
+        'p',
+        '',
+        'Toca cualquier puesto libre del tablero para cambiarte de equipo o de posición. ' +
+          'Lo que no ocupe nadie lo jugará un bot.',
+      ),
+    );
 
     const actions = el('div', 'menu-actions');
     const readyButton = el('button', ready ? '' : 'primary', ready ? 'Cancelar listo' : 'Listo');
@@ -251,7 +414,7 @@ export function onlineScreen(parent: HTMLElement, hooks: OnlineHooks): HTMLEleme
     actions.append(readyButton, back);
     side.append(actions);
 
-    wrap.append(roster, side);
+    wrap.append(left, side);
     screen.append(wrap);
   };
 

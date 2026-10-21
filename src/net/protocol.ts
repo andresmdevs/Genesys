@@ -37,6 +37,8 @@ export interface Pick {
 
 export type ClientMessage =
   | { t: 'hello'; version: number; name: string }
+  /** Claim a seat: slots 0-4 are blue, 5-9 red, ordered top to support. */
+  | { t: 'seat'; slot: number }
   | { t: 'pick'; championId: string }
   | { t: 'ready'; ready: boolean }
   /** Commands the client wants applied on `tick`. */

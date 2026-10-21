@@ -10,6 +10,7 @@ import {
   type Team,
   type TowerSpot,
 } from '../data/map.ts';
+import { laneOf, type Position } from './positions.ts';
 import { TOWER_FORTIFY_UNTIL } from './constants.ts';
 import { makeGrowth, makeStats, ZERO_STATS } from './stats.ts';
 import { NEUTRAL } from './types.ts';
@@ -75,7 +76,7 @@ export function spawnChampion(
   def: ChampionDef,
   team: Team,
   playerSlot: number,
-  lane: LaneId,
+  position: Position,
   isBot: boolean,
 ): Unit {
   const unit = baseUnit({
@@ -117,7 +118,8 @@ export function spawnChampion(
     role: def.role,
     playerSlot,
     isBot,
-    lane,
+    position,
+    lane: laneOf(position),
     gold: 0,
     totalGold: 0,
     items: [],

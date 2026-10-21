@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { CHAMPIONS } from '../../champions/index.ts';
-import { BLUE, RED, type LaneId } from '../../data/map.ts';
+import { BLUE, RED} from '../../data/map.ts';
 import { TICK_RATE } from '../constants.ts';
+import { POSITIONS } from '../positions.ts';
 import { Match, type SlotConfig } from '../match.ts';
 
 function allBotSlots(): SlotConfig[] {
-  const lanes: LaneId[] = [0, 1, 1, 2, 2];
+  
   const out: SlotConfig[] = [];
   for (let i = 0; i < 5; i++) {
     out.push({
       slot: i,
       championId: CHAMPIONS[i].id,
       team: BLUE,
-      lane: lanes[i],
+      position: POSITIONS[i],
       isBot: true,
       displayName: `Azul ${i}`,
     });
@@ -20,7 +21,7 @@ function allBotSlots(): SlotConfig[] {
       slot: i + 5,
       championId: CHAMPIONS[i + 5].id,
       team: RED,
-      lane: lanes[i],
+      position: POSITIONS[i],
       isBot: true,
       displayName: `Rojo ${i}`,
     });
@@ -61,6 +62,26 @@ describe('bot play', () => {
     },
     { timeout: 180000 },
   );
+
+  it('sends the jungler to clear camps instead of standing in a lane', () => {
+    const match = new Match({ seed: 21, slots: allBotSlots() });
+    for (let i = 0; i < TICK_RATE * 300; i++) match.step();
+
+    const junglers = match.champions.filter((c) => c.champion!.position === 'jungle');
+    expect(junglers).toHaveLength(2);
+
+    for (const jungler of junglers) {
+      // Camp kills show up as creep score, same as minions.
+      expect(jungler.champion!.creepScore, `${jungler.name} never cleared a camp`)
+        .toBeGreaterThan(3);
+    }
+
+    // And at least one camp should be on respawn rather than all standing.
+    const campsAlive = [...match.world.units.values()].filter(
+      (u) => u.kind === 'monster' && u.alive && u.monster!.kind === 'camp',
+    ).length;
+    expect(campsAlive).toBeLessThan(12 * 3);
+  });
 
   it('keeps bots out of their own fountain once the game is under way', () => {
     const match = new Match({ seed: 11, slots: allBotSlots() });

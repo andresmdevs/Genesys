@@ -41,12 +41,25 @@ const a = await joinAs('Ana');
 const b = await joinAs('Bruno');
 console.log('ambos jugadores en la sala');
 
-// Each picks a different champion, then both ready up to start immediately.
+// Both players take seats on the SAME team, in different positions: this is
+// the case a pair of friends cares about, and the one that used to be
+// impossible when the server handed out slots by itself.
+await a.locator('.seat', { hasText: 'TOP' }).first().click();
+await a.waitForTimeout(500);
+await b.locator('.seat', { hasText: 'JG' }).first().click();
+await b.waitForTimeout(500);
+
 await a.locator('.champ-card', { hasText: 'Ryka' }).click();
 await b.locator('.champ-card', { hasText: 'Grommar' }).click();
 await a.waitForTimeout(400);
-await a.getByRole('button', { name: 'Listo' }).click();
-await b.getByRole('button', { name: 'Listo' }).click();
+
+const seats = await a.evaluate(() =>
+  [...document.querySelectorAll('.seat')].map((s) => s.textContent),
+);
+console.log('tablero:', JSON.stringify(seats.slice(0, 5)));
+
+await a.getByRole('button', { name: 'Listo', exact: true }).click();
+await b.getByRole('button', { name: 'Listo', exact: true }).click();
 
 await a.waitForSelector('#minimap', { timeout: 15000 });
 await b.waitForSelector('#minimap', { timeout: 15000 });
@@ -89,6 +102,15 @@ console.log(`tick A=${fa.tick} B=${fb.tick}`);
 console.log(`roster A: ${fa.champions}`);
 console.log(`roster B: ${fb.champions}`);
 
+// Both humans must have landed where they clicked.
+const seated = await a.evaluate(() => {
+  const g = window.genesys;
+  return g.match.champions
+    .filter((c) => !c.champion.isBot)
+    .map((c) => `${c.name}:${c.team === 0 ? 'azul' : 'rojo'}:${c.champion.position}:${c.champion.championId}`);
+});
+console.log(`humanos: ${seated.join(' | ')}`);
+
 let failed = false;
 if (fa.tick !== fb.tick) {
   console.error('FAIL: los clientes no convergieron al mismo tick');
@@ -102,6 +124,12 @@ if (fa.tick !== fb.tick) {
   failed = true;
 } else {
   console.log(`PASS: ambos mundos son idénticos en el tick ${fa.tick} (${fa.units.split('|').length} unidades)`);
+}
+if (seated.length !== 2 || !seated.every((s) => s.includes('azul'))) {
+  console.error('FAIL: los dos jugadores no acabaron en el equipo que eligieron');
+  failed = true;
+} else {
+  console.log('PASS: ambos jugadores en el equipo y la posición elegidos');
 }
 if (fa.champions !== fb.champions) {
   console.error('FAIL: los clientes construyeron plantillas distintas');

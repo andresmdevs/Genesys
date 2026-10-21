@@ -15,6 +15,21 @@ import {
   type ServerMessage,
 } from './protocol.ts';
 
+/**
+ * What the game needs from a connection, whether it reaches the other players
+ * through a dedicated server or straight through a peer-to-peer channel.
+ */
+export interface RoomLink {
+  readonly slot: number;
+  handlers: NetHandlers;
+  pick(championId: string): void;
+  claimSeat(slot: number): void;
+  setReady(ready: boolean): void;
+  sendCommands(tick: number, cmds: Command[]): void;
+  close(): void;
+  readonly connected: boolean;
+}
+
 export interface NetHandlers {
   onLobby(players: LobbyPlayer[], secondsLeft: number): void;
   onStart(seed: number, picks: Pick[], slot: number): void;
@@ -24,7 +39,7 @@ export interface NetHandlers {
   onError(message: string): void;
 }
 
-export class NetClient {
+export class NetClient implements RoomLink {
   slot = -1;
   /** Round-trip time in milliseconds, or -1 before the first ping. */
   latency = -1;
@@ -110,6 +125,11 @@ export class NetClient {
 
   pick(championId: string): void {
     this.send({ t: 'pick', championId });
+  }
+
+  /** Claims a lobby seat, which is a team and a position together. */
+  claimSeat(slot: number): void {
+    this.send({ t: 'seat', slot });
   }
 
   setReady(ready: boolean): void {

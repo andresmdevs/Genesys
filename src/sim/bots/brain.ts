@@ -15,6 +15,7 @@ import { dist, distSq, normalize, type Vec2 } from '../../core/math.ts';
 import { getChampion } from '../../champions/index.ts';
 import { getItem, effectiveCost } from '../../data/items.ts';
 import {
+  CAMP_SPOTS,
   FOUNTAIN_POS,
   LANES,
   NEXUS_POS,
@@ -24,6 +25,7 @@ import {
   type LaneId,
   type Team,
 } from '../../data/map.ts';
+import { isJungle, laneOf } from '../positions.ts';
 import { mitigate } from '../combat.ts';
 import { MAX_ITEMS, secToTicks } from '../constants.ts';
 import { issueMove, stopMoving } from '../movement.ts';
@@ -32,7 +34,7 @@ import type { AbilityKey, Unit } from '../types.ts';
 import type { Match } from '../match.ts';
 import { setBotController } from './controller.ts';
 
-type BotState = 'lane' | 'fight' | 'flee' | 'recall' | 'shop' | 'push' | 'objective';
+type BotState = 'lane' | 'jungle' | 'fight' | 'flee' | 'recall' | 'shop' | 'push' | 'objective';
 
 interface BotMemory {
   state: BotState;
@@ -185,9 +187,13 @@ function decide(match: Match, unit: Unit, memory: BotMemory, s: Situation): BotS
 
   // Mid game onwards bots group on structures, but they keep farming while
   // they wait. Fighting on sight at this point stalls the economy completely.
+  // The jungler joins this too: a jungler who never leaves the camps is a
+  // player down for the rest of the game.
   if (minutes > 9 && memory.state !== 'recall') return 'objective';
 
-  const target = nextStructureInLane(match, unit.team as Team, champ.lane);
+  if (isJungle(champ.position)) return 'jungle';
+
+  const target = nextStructureInLane(match, unit.team as Team, laneOf(champ.position));
   if (target && s.alliedMinionsNear >= 2 && dist(unit.pos, target.pos) < 1400) return 'push';
 
   return 'lane';
@@ -224,6 +230,9 @@ function act(match: Match, unit: Unit, memory: BotMemory, s: Situation): void {
     case 'fight':
       doFight(match, unit, memory, s);
       break;
+    case 'jungle':
+      doJungle(match, unit, memory, s);
+      break;
     case 'push':
     case 'objective':
       doPush(match, unit, memory, s);
@@ -236,7 +245,7 @@ function act(match: Match, unit: Unit, memory: BotMemory, s: Situation): void {
 function doShop(match: Match, unit: Unit): void {
   // Healed up and done buying: head back out to lane.
   if (unit.hp > unit.stats.maxHp * 0.9 && unit.mana > unit.stats.maxMana * 0.6) {
-    issueMove(unit, laneAnchor(match, unit.team as Team, unit.champion!.lane));
+    issueMove(unit, laneAnchor(match, unit.team as Team, laneOf(unit.champion!.position)));
   } else {
     stopMoving(unit);
   }
@@ -307,7 +316,7 @@ function doFight(match: Match, unit: Unit, memory: BotMemory, s: Situation): voi
 function doLane(match: Match, unit: Unit, memory: BotMemory, s: Situation): void {
   const world = match.world;
   const team = unit.team as Team;
-  const lane = unit.champion!.lane;
+  const lane = laneOf(unit.champion!.position);
 
   // Standing in enemy turret range without a wave is how bots feed.
   if (s.underEnemyTower && s.alliedMinionsNear < 3) {
@@ -356,13 +365,108 @@ function doLane(match: Match, unit: Unit, memory: BotMemory, s: Situation): void
   if (distSq(unit.pos, anchor) > 420 * 420) issueMove(unit, anchor);
 }
 
+/**
+ * Junglers clear camps on their own half and leave to gank when a lane is in
+ * trouble, which is what makes the fifth position feel different from a laner
+ * rather than being a laner who stands in the wrong place.
+ */
+function doJungle(match: Match, unit: Unit, memory: BotMemory, s: Situation): void {
+  const world = match.world;
+  const team = unit.team as Team;
+
+  // Something already attacking us, or a camp in range, comes first.
+  const inReach = world
+    .enemiesOf(team, unit.pos, unit.stats.attackRange + 260)
+    .filter((u) => u.kind === 'monster' || u.kind === 'minion');
+  if (inReach.length > 0) {
+    let weakest = inReach[0];
+    for (const m of inReach) if (m.hp < weakest.hp) weakest = m;
+    unit.attackTargetId = weakest.id;
+    unit.orderTargetId = weakest.id;
+    return;
+  }
+
+  // A lane where our side is outnumbered is worth more than another camp.
+  const gank = findGank(match, unit);
+  if (gank && s.hpFraction > 0.55) {
+    unit.attackTargetId = -1;
+    issueMove(unit, gank);
+    return;
+  }
+
+  const camp = nearestCamp(match, unit);
+  if (camp) {
+    unit.attackTargetId = camp.id;
+    unit.orderTargetId = camp.id;
+    if (dist(unit.pos, camp.pos) > unit.stats.attackRange + camp.radius) {
+      issueMove(unit, camp.pos);
+    }
+    return;
+  }
+
+  // Nothing to clear: help the nearest lane instead of idling in a bush.
+  const lane = laneOf('mid');
+  const path = lanePathFor(team, lane);
+  issueMove(unit, path[Math.floor(path.length / 2)]);
+  void memory;
+}
+
+/** Nearest living camp monster, preferring this side of the river. */
+function nearestCamp(match: Match, unit: Unit): Unit | undefined {
+  const team = unit.team as Team;
+  const ownSide = new Set(CAMP_SPOTS.filter((c) => c.side === team).map((c) => c.id));
+  let best: Unit | undefined;
+  let bestScore = Infinity;
+
+  for (const u of match.world.units.values()) {
+    if (!u.alive || u.kind !== 'monster' || u.monster!.kind !== 'camp') continue;
+    const d = dist(unit.pos, u.pos);
+    // Enemy-side camps are worth taking, just not as a first choice.
+    const score = d * (ownSide.has(u.monster!.campId) ? 1 : 2.2);
+    if (score < bestScore) {
+      bestScore = score;
+      best = u;
+    }
+  }
+  return best;
+}
+
+/** A lane worth walking to: an allied champion there is outnumbered. */
+function findGank(match: Match, unit: Unit): Vec2 | undefined {
+  const team = unit.team as Team;
+  let best: Vec2 | undefined;
+  let bestScore = 0;
+
+  for (const ally of match.champions) {
+    if (!ally.alive || ally.team !== team || ally.id === unit.id) continue;
+    if (ally.champion!.position === 'jungle') continue;
+    const enemies = match.world
+      .enemiesOf(team, ally.pos, 1300)
+      .filter((u) => u.kind === 'champion').length;
+    const friends = match.world
+      .alliesOf(team, ally.pos, 1300)
+      .filter((u) => u.kind === 'champion').length;
+    if (enemies === 0) continue;
+
+    // Prefer a nearby lane that is losing the numbers game.
+    const pressure = enemies - friends;
+    const travel = dist(unit.pos, ally.pos);
+    const score = pressure * 2 + (enemies > 0 ? 1 : 0) - travel / 2500;
+    if (score > bestScore && travel < 5200) {
+      bestScore = score;
+      best = ally.pos;
+    }
+  }
+  return best;
+}
+
 function doPush(match: Match, unit: Unit, memory: BotMemory, s: Situation): void {
   const team = unit.team as Team;
   const champ = unit.champion!;
   const minutes = match.world.seconds / 60;
 
   // Mid game onwards everyone converges on one lane so pushes are not solo.
-  const lane: LaneId = minutes > 9 ? teamPushLane(match, team) : champ.lane;
+  const lane: LaneId = minutes > 9 ? teamPushLane(match, team) : laneOf(champ.position);
   const structure = nextStructureInLane(match, team, lane);
 
   if (!structure) {

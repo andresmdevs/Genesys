@@ -12,8 +12,14 @@ terceros: todo es TypeScript y un `<canvas>`.
 
 ## Jugar
 
-Una vez desplegado en GitHub Pages, el juego vive en
-`https://<tu-usuario>.github.io/Genesys/`.
+**https://andresmdevs.github.io/Genesys/** — se juega en la pestaña, sin
+instalar nada.
+
+- **Contra la IA**: eliges campeón y posición y empiezas.
+- **Con amigos**: *Partida online → Crear sala*. Te da un código de cinco
+  letras; quien lo escriba entra contigo. No hace falta cuenta, ni servidor,
+  ni desplegar nada: los navegadores hablan entre ellos. Los puestos que no
+  ocupe nadie los juegan bots, así que una partida siempre sale.
 
 En local:
 
@@ -47,8 +53,10 @@ npm run dev
 - **Bots que juegan de verdad**: farmean, respetan las torres, se retiran
   heridos, vuelven a base, compran objetos siguiendo su guía, se agrupan y
   cierran la partida.
-- **Multijugador online en lockstep** con relleno de bots si la sala no se
-  llena en cinco minutos.
+- **Multijugador en lockstep**, por conexión directa entre navegadores con un
+  código de sala o contra un servidor dedicado. Eliges equipo y posición en un
+  tablero de diez puestos, y lo que quede libre lo cubren bots pasados cinco
+  minutos.
 
 ## Controles
 
@@ -111,11 +119,24 @@ resultado.
 
 Como la simulación es determinista (y hay una prueba que lo verifica), los
 clientes no necesitan intercambiar estado del mundo: basta con ponerse de
-acuerdo en **qué órdenes se aplican en qué tick**. El servidor solo reparte
-esas órdenes, nunca simula nada, y por eso cabe en el plan gratuito de
-cualquier proveedor. El coste es un retraso de entrada fijo de cuatro ticks
-(unos 130 ms); la ventaja es que la desincronización es imposible mientras la
-simulación siga siendo determinista.
+acuerdo en **qué órdenes se aplican en qué tick**. Quien reparte esas órdenes
+nunca simula nada, y por eso el mismo papel lo puede hacer el navegador de un
+jugador. El coste es un retraso de entrada fijo de cuatro ticks (unos 130 ms);
+la ventaja es que la desincronización es imposible mientras la simulación siga
+siendo determinista.
+
+Ese reparto corre en un *web worker*: los navegadores estrangulan los
+temporizadores de las pestañas que no están en primer plano, y sin el worker la
+partida bajaba de 30 a 10 ticks por segundo en cuanto el anfitrión cambiaba de
+ventana.
+
+Hay tres maneras de juntarse, con las mismas reglas de sala en las tres:
+
+| | Qué hace falta | Cuándo usarlo |
+| --- | --- | --- |
+| **Código de sala** | Nada | Por defecto. Jugar con amigos ya |
+| **Cloudflare Workers** | Cuenta gratuita | Partidas públicas, redes restrictivas |
+| **Node propio** | Una máquina | Red local o servidor propio |
 
 ## Desarrollo
 
@@ -130,14 +151,19 @@ Pruebas en navegador real (necesitan `npm run build && npm run preview`):
 ```bash
 node scripts/smoke.mjs      # recorre las pantallas y detecta errores de consola
 node scripts/playtest.mjs   # juega de verdad: moverse, farmear, lanzar, comprar
-node scripts/mp-test.mjs    # dos navegadores en la misma sala, comprueba la sincronía
+node scripts/mp-test.mjs    # dos navegadores contra un servidor, comprueba la sincronía
+node scripts/p2p-test.mjs   # dos navegadores por conexión directa, sin servidor
 ```
 
 ## Despliegue
 
-**El juego** se publica solo: cada empujón a `main` dispara el flujo de
-`.github/workflows/deploy.yml`, que compila y publica en GitHub Pages. Activa
-Pages en *Settings → Pages → Source: GitHub Actions*.
+**El juego** está publicado en GitHub Pages desde la rama `gh-pages`, que
+contiene solo el resultado de compilar. Es gratis porque el repositorio es
+público. Para actualizarlo:
+
+```bash
+npm run deploy
+```
 
 Si alojas el juego en la raíz de un dominio en vez de en `/Genesys/`, compila
 con `BASE_PATH=/ npm run build`.

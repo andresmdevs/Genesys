@@ -13,7 +13,7 @@ import type { Command } from '../sim/commands.ts';
 import { DT } from '../sim/constants.ts';
 import type { Match } from '../sim/match.ts';
 import { INPUT_DELAY } from './protocol.ts';
-import type { NetClient } from './client.ts';
+import type { RoomLink } from './client.ts';
 
 export class LockstepDriver {
   /** True while the client is stalled waiting for the next bundle. */
@@ -30,7 +30,7 @@ export class LockstepDriver {
 
   constructor(
     readonly match: Match,
-    private readonly net: NetClient,
+    private readonly net: RoomLink,
   ) {}
 
   receiveBundle(tick: number, cmds: Command[]): void {

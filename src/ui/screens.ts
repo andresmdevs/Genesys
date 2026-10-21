@@ -6,6 +6,12 @@
 import { CHAMPIONS, championsByRole } from '../champions/index.ts';
 import type { ChampionDef } from '../champions/types.ts';
 import { ROLES, ROLE_NAMES, type ChampionRole } from '../sim/types.ts';
+import {
+  DEFAULT_POSITION_FOR_ROLE,
+  POSITIONS,
+  POSITION_NAMES,
+  type Position,
+} from '../sim/positions.ts';
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -61,6 +67,7 @@ export function mainMenu(parent: HTMLElement, actions: MenuActions): HTMLElement
 
 export interface SelectResult {
   champion: ChampionDef;
+  position: Position;
 }
 
 export function championSelect(
@@ -76,6 +83,9 @@ export function championSelect(
   const detail = el('div', 'detail panel');
 
   let selected: ChampionDef = CHAMPIONS[0];
+  let position: Position = DEFAULT_POSITION_FOR_ROLE[selected.role];
+  /** True once the player picks a position by hand, so it stops following the champion. */
+  let positionChosen = false;
   const cards = new Map<string, HTMLElement>();
 
   const renderDetail = (): void => {
@@ -109,8 +119,23 @@ export function championSelect(
     }
     detail.append(list);
 
+    // Position is independent of the champion: playing a mage in the jungle
+    // is a choice, so the picker only follows the champion until it is touched.
+    detail.append(el('div', 'role-label', 'Posición'));
+    const posRow = el('div', 'position-row');
+    for (const p of POSITIONS) {
+      const button = el('button', p === position ? 'pos on' : 'pos', POSITION_NAMES[p]);
+      button.addEventListener('click', () => {
+        position = p;
+        positionChosen = true;
+        renderDetail();
+      });
+      posRow.append(button);
+    }
+    detail.append(posRow);
+
     const confirm = el('button', 'primary', `Jugar como ${selected.name}`);
-    confirm.addEventListener('click', () => onConfirm({ champion: selected }));
+    confirm.addEventListener('click', () => onConfirm({ champion: selected, position }));
     const back = el('button', '', 'Volver');
     back.addEventListener('click', onBack);
     const row = el('div', 'menu-actions');
@@ -120,6 +145,7 @@ export function championSelect(
 
   const select = (def: ChampionDef): void => {
     selected = def;
+    if (!positionChosen) position = DEFAULT_POSITION_FOR_ROLE[def.role];
     for (const [id, card] of cards) card.classList.toggle('selected', id === def.id);
     renderDetail();
   };

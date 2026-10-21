@@ -26,7 +26,7 @@ import {
   enemyOf,
   inFountain,
   lanePathFor,
-  type LaneId,
+
   type Team,
 } from '../data/map.ts';
 import { stepAutoAttacks, cancelAttack } from './attacks.ts';
@@ -81,6 +81,7 @@ import { runBotTick } from './bots/controller.ts';
 // Registers the bot controller; imported for the side effect only.
 import './bots/brain.ts';
 import type { Command } from './commands.ts';
+import type { Position } from './positions.ts';
 import type { AbilityKey, MinionKind, Unit } from './types.ts';
 import { World } from './world.ts';
 
@@ -88,7 +89,8 @@ export interface SlotConfig {
   slot: number;
   championId: string;
   team: Team;
-  lane: LaneId;
+  /** Where this player plays; the lane follows from it. */
+  position: Position;
   isBot: boolean;
   displayName: string;
 }
@@ -140,7 +142,7 @@ export class Match {
     for (const cfg of this.config.slots) {
       const def = getChampion(cfg.championId);
       if (!def) throw new Error(`Unknown champion: ${cfg.championId}`);
-      const unit = spawnChampion(this.world, def, cfg.team, cfg.slot, cfg.lane, cfg.isBot);
+      const unit = spawnChampion(this.world, def, cfg.team, cfg.slot, cfg.position, cfg.isBot);
       unit.name = cfg.displayName;
       unit.champion!.gold = STARTING_GOLD;
       unit.champion!.totalGold = STARTING_GOLD;

@@ -9,10 +9,15 @@
 import { CHAMPIONS, championsByRole, getChampion } from '../champions/index.ts';
 import type { ChampionDef } from '../champions/types.ts';
 import { Rng } from '../core/rng.ts';
-import { BLUE, RED, type Team } from '../data/map.ts';
+import { BLUE, RED } from '../data/map.ts';
 import type { SlotConfig } from '../sim/match.ts';
-import { ROLES, type ChampionRole } from '../sim/types.ts';
-import { LANE_FOR_ROLE } from '../ui/lanes.ts';
+import type { ChampionRole } from '../sim/types.ts';
+import {
+  POSITIONS,
+  positionOfSlot,
+  teamOfSlot,
+  type Position,
+} from '../sim/positions.ts';
 import type { Pick } from './protocol.ts';
 
 const BOT_NAMES = [
@@ -41,26 +46,24 @@ export function buildOnlineRoster(seed: number, picks: Pick[]): SlotConfig[] {
     }
   }
 
-  // Then fill each team's missing roles with whatever is still free.
-  for (const team of [BLUE, RED] as Team[]) {
-    const slots = team === BLUE ? [0, 1, 2, 3, 4] : [5, 6, 7, 8, 9];
-    const open = slots.filter((s) => !assigned.has(s));
-    const covered = new Set<ChampionRole>();
-    for (const s of slots) {
-      const def = assigned.get(s);
-      if (def) covered.add(def.role);
-    }
-    const missing = ROLES.filter((r) => !covered.has(r as ChampionRole)) as ChampionRole[];
+  // Each seat has a champion pair that suits it; empty seats take whichever
+  // of those is still free, falling back to anything left.
+  const roleFor: Record<Position, ChampionRole> = {
+    top: 'top',
+    jungle: 'mid',
+    mid: 'mage',
+    adc: 'adc',
+    support: 'support',
+  };
 
-    for (const slot of open) {
-      const role = missing.shift();
-      const pool = (role ? championsByRole(role) : CHAMPIONS).filter((c) => !taken.has(c.id));
-      const fallback = CHAMPIONS.filter((c) => !taken.has(c.id));
-      const choices = pool.length > 0 ? pool : fallback;
-      const def = choices.length > 0 ? choices[rng.int(0, choices.length - 1)] : CHAMPIONS[0];
-      assigned.set(slot, def);
-      taken.add(def.id);
-    }
+  for (let slot = 0; slot < 10; slot++) {
+    if (assigned.has(slot)) continue;
+    const pool = championsByRole(roleFor[positionOfSlot(slot)]).filter((c) => !taken.has(c.id));
+    const fallback = CHAMPIONS.filter((c) => !taken.has(c.id));
+    const choices = pool.length > 0 ? pool : fallback;
+    const def = choices.length > 0 ? choices[rng.int(0, choices.length - 1)] : CHAMPIONS[0];
+    assigned.set(slot, def);
+    taken.add(def.id);
   }
 
   const out: SlotConfig[] = [];
@@ -72,11 +75,13 @@ export function buildOnlineRoster(seed: number, picks: Pick[]): SlotConfig[] {
     out.push({
       slot,
       championId: def.id,
-      team: slot < 5 ? BLUE : RED,
-      lane: LANE_FOR_ROLE[def.role],
+      team: teamOfSlot(slot) === 0 ? BLUE : RED,
+      position: positionOfSlot(slot),
       isBot,
       displayName: isBot ? BOT_NAMES[botName++ % BOT_NAMES.length] : (pick?.name ?? `Jugador ${slot}`),
     });
   }
   return out;
 }
+
+export { POSITIONS };

@@ -21,61 +21,74 @@ import { Input } from './input/input.ts';
 import type { Command } from './sim/commands.ts';
 import { LocalDriver, type Driver } from './sim/driver.ts';
 import { LockstepDriver } from './net/lockstep.ts';
-import type { NetClient } from './net/client.ts';
+import type { RoomLink } from './net/client.ts';
 import { Match, type MatchConfig, type SlotConfig } from './sim/match.ts';
-import { ROLES, type AbilityKey, type ChampionRole, type Unit } from './sim/types.ts';
+import type { AbilityKey, ChampionRole, Unit } from './sim/types.ts';
+import {
+  DEFAULT_POSITION_FOR_ROLE,
+  POSITIONS,
+  slotFor,
+  type Position,
+} from './sim/positions.ts';
 import { Hud } from './ui/hud.ts';
-import { LANE_FOR_ROLE } from './ui/lanes.ts';
 import { Scoreboard } from './ui/scoreboard.ts';
 import { Shop } from './ui/shop.ts';
 import { championSelect, endScreen, helpPanel, mainMenu } from './ui/screens.ts';
 
 type Scene = 'menu' | 'select' | 'playing' | 'end';
 
-/** Builds a full ten-champion roster around the player's pick. */
-export function buildRoster(player: ChampionDef, seed: number, playerName = 'Tú'): SlotConfig[] {
+/**
+ * Builds a full ten-champion roster around the player's pick.
+ *
+ * Each of the five positions gets one champion per side, drawn from the pair
+ * that suits it, so every champion appears exactly once.
+ */
+export function buildRoster(
+  player: ChampionDef,
+  seed: number,
+  playerName = 'Tú',
+  playerPosition?: Position,
+): SlotConfig[] {
   const rng = new Rng(seed);
-  const allies = new Map<ChampionRole, ChampionDef>();
-  const enemies = new Map<ChampionRole, ChampionDef>();
-  allies.set(player.role, player);
-
-  for (const role of ROLES) {
-    const options = championsByRole(role);
-    if (role === player.role) {
-      enemies.set(role, options.find((c) => c.id !== player.id) ?? options[0]);
-      continue;
-    }
-    // Each role has two champions; one goes to each side so all ten are used.
-    const first = rng.chance(0.5) ? 0 : 1;
-    allies.set(role, options[first]);
-    enemies.set(role, options[1 - first] ?? options[first]);
-  }
-
   const names = ['Arden', 'Brisa', 'Cairo', 'Duna', 'Eris', 'Faro', 'Gala', 'Hilo', 'Ira'];
-  const slots: SlotConfig[] = [];
-  let botName = 0;
+  const mine = playerPosition ?? DEFAULT_POSITION_FOR_ROLE[player.role];
 
-  const add = (def: ChampionDef, team: Team, slot: number, isBot: boolean): void => {
-    slots.push({
-      slot,
-      championId: def.id,
-      team,
-      lane: LANE_FOR_ROLE[def.role],
-      isBot,
-      displayName: isBot ? names[botName++ % names.length] : playerName,
-    });
+  // Which champion pair feeds which position.
+  const roleFor: Record<Position, ChampionRole> = {
+    top: 'top',
+    jungle: 'mid',
+    mid: 'mage',
+    adc: 'adc',
+    support: 'support',
   };
 
-  add(player, BLUE, 0, false);
-  let index = 1;
-  for (const role of ROLES) {
-    if (role === player.role) continue;
-    add(allies.get(role)!, BLUE, index++, true);
-  }
-  index = 5;
-  for (const role of ROLES) add(enemies.get(role)!, RED, index++, true);
+  const taken = new Set<string>([player.id]);
+  const pickFree = (position: Position): ChampionDef => {
+    const pool = championsByRole(roleFor[position]).filter((c) => !taken.has(c.id));
+    const fallback = CHAMPIONS.filter((c) => !taken.has(c.id));
+    const choices = pool.length > 0 ? pool : fallback;
+    const def = choices[rng.int(0, Math.max(0, choices.length - 1))] ?? CHAMPIONS[0];
+    taken.add(def.id);
+    return def;
+  };
 
-  return slots;
+  const slots: SlotConfig[] = [];
+  let botName = 0;
+  for (const team of [BLUE, RED] as Team[]) {
+    for (const position of POSITIONS) {
+      const isPlayer = team === BLUE && position === mine;
+      const def = isPlayer ? player : pickFree(position);
+      slots.push({
+        slot: slotFor(team, position),
+        championId: def.id,
+        team,
+        position,
+        isBot: !isPlayer,
+        displayName: isPlayer ? playerName : names[botName++ % names.length],
+      });
+    }
+  }
+  return slots.sort((a, b) => a.slot - b.slot);
 }
 
 class Game {
@@ -89,8 +102,9 @@ class Game {
   match: Match | null = null;
   playerSlot = -1;
   private driver: Driver | null = null;
-  private net: NetClient | null = null;
+  private net: RoomLink | null = null;
   private lastPick: ChampionDef = CHAMPIONS[0];
+  private lastPosition: Position = 'mid';
 
   private hud: Hud | null = null;
   private shop: Shop | null = null;
@@ -145,7 +159,7 @@ class Game {
     this.scene = 'select';
     this.screen = championSelect(
       this.ui,
-      ({ champion }) => this.startPractice(champion),
+      ({ champion, position }) => this.startPractice(champion, position),
       () => this.showMenu(),
     );
   }
@@ -161,18 +175,20 @@ class Game {
     });
   }
 
-  private startPractice(champion: ChampionDef): void {
+  private startPractice(champion: ChampionDef, position?: Position): void {
     this.lastPick = champion;
+    this.lastPosition = position ?? DEFAULT_POSITION_FOR_ROLE[champion.role];
     const seed = (Math.random() * 0xffffffff) >>> 0;
-    const config: MatchConfig = { seed, slots: buildRoster(champion, seed) };
-    this.startMatch(config, 0, champion);
+    const slots = buildRoster(champion, seed, 'Tú', this.lastPosition);
+    const mine = slots.find((s) => !s.isBot)!;
+    this.startMatch({ seed, slots }, mine.slot, champion);
   }
 
   private startMatch(
     config: MatchConfig,
     slot: number,
     champion: ChampionDef,
-    net: NetClient | null = null,
+    net: RoomLink | null = null,
   ): void {
     this.clearScreen();
     this.teardownMatch();
@@ -307,7 +323,7 @@ class Game {
     this.screen = endScreen(
       this.ui,
       summary,
-      () => this.startPractice(pick),
+      () => this.startPractice(pick, this.lastPosition),
       () => this.showMenu(),
     );
   }

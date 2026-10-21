@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { CHAMPIONS } from '../champions/index.ts';
 import { ABILITY_KEYS, type AbilityKey } from './types.ts';
-import { BLUE, LANES, RED, type LaneId, type Team } from '../data/map.ts';
+import { BLUE, LANES, RED, type Team } from '../data/map.ts';
 import { Match, type SlotConfig } from './match.ts';
 import { TICK_RATE } from './constants.ts';
+import { POSITIONS } from './positions.ts';
 
 function buildSlots(): SlotConfig[] {
-  const roles: LaneId[] = [0, 1, 1, 2, 2];
+  
   return CHAMPIONS.flatMap((def, i) =>
     ([BLUE, RED] as Team[]).map((team) => ({
       slot: team === BLUE ? i : i + 10,
       championId: def.id,
       team,
-      lane: roles[i % roles.length],
+      position: POSITIONS[i % POSITIONS.length],
       isBot: true,
       displayName: `${def.name}-${team}`,
     })),
@@ -22,14 +23,14 @@ function buildSlots(): SlotConfig[] {
 /** Ten champions, five a side, mirrored so both teams have the same kits. */
 function tenSlots(): SlotConfig[] {
   const picks = CHAMPIONS.slice(0, 5).map((c) => c.id);
-  const lanes: LaneId[] = [0, 1, 1, 2, 2];
+  
   const out: SlotConfig[] = [];
   for (let i = 0; i < 5; i++) {
     out.push({
       slot: i,
       championId: picks[i],
       team: BLUE,
-      lane: lanes[i],
+      position: POSITIONS[i],
       isBot: true,
       displayName: `Azul ${i}`,
     });
@@ -37,7 +38,7 @@ function tenSlots(): SlotConfig[] {
       slot: i + 5,
       championId: CHAMPIONS[5 + i].id,
       team: RED,
-      lane: lanes[i],
+      position: POSITIONS[i],
       isBot: true,
       displayName: `Rojo ${i}`,
     });
@@ -129,12 +130,12 @@ describe('match simulation', () => {
       const match = new Match({
         seed: 99,
         slots: [
-          { slot: 0, championId: def.id, team: BLUE, lane: 1, isBot: false, displayName: 'A' },
+          { slot: 0, championId: def.id, team: BLUE, position: 'mid', isBot: false, displayName: 'A' },
           {
             slot: 1,
             championId: CHAMPIONS[(CHAMPIONS.indexOf(def) + 1) % CHAMPIONS.length].id,
             team: RED,
-            lane: 1,
+            position: 'mid',
             isBot: false,
             displayName: 'B',
           },
@@ -197,8 +198,8 @@ describe('match simulation', () => {
       const m = new Match({
         seed,
         slots: [
-          { slot: 0, championId: 'ryka', team: BLUE, lane: 1, isBot: false, displayName: 'A' },
-          { slot: 1, championId: 'korvath', team: RED, lane: 1, isBot: false, displayName: 'B' },
+          { slot: 0, championId: 'ryka', team: BLUE, position: 'mid', isBot: false, displayName: 'A' },
+          { slot: 1, championId: 'korvath', team: RED, position: 'mid', isBot: false, displayName: 'B' },
         ],
       });
       const attacker = m.championOf(0)!;

@@ -136,6 +136,7 @@ export function spawnChampion(
     deathStreak: 0,
     damageDealt: 0,
     damageTaken: 0,
+    attackMovePoint: null,
     recallTicks: -1,
     flashCooldown: 0,
     healCooldown: 0,

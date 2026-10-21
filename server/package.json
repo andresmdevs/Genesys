@@ -1,0 +1,16 @@
+{
+  "name": "genesys-room-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Matchmaking and lockstep relay for Genesys",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "~5.6.3",
+    "wrangler": "^3.95.0"
+  }
+}

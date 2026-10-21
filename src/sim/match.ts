@@ -214,31 +214,26 @@ export class Match {
         case 'move':
           this.cancelRecall(unit);
           cancelAttack(unit);
+          champ.attackMovePoint = null;
           unit.orderTargetId = -1;
           unit.attackTargetId = -1;
           champ.recallTicks = -1;
           issueMove(unit, { x: cmd.x, y: cmd.y });
           break;
 
-        case 'attackMove': {
+        case 'attackMove':
           this.cancelRecall(unit);
           cancelAttack(unit);
           unit.orderTargetId = -1;
-          const found = acquireChampionTarget(this.world, unit, unit.stats.attackRange + 250);
-          if (found >= 0) {
-            unit.attackTargetId = found;
-            unit.orderTargetId = found;
-          } else {
-            unit.attackTargetId = -1;
-            issueMove(unit, { x: cmd.x, y: cmd.y });
-          }
+          champ.attackMovePoint = { x: cmd.x, y: cmd.y };
+          this.serviceAttackMove(unit);
           break;
-        }
 
         case 'attackUnit': {
           this.cancelRecall(unit);
           const target = this.world.living(cmd.target);
           if (target && target.team !== unit.team) {
+            champ.attackMovePoint = null;
             unit.attackTargetId = target.id;
             unit.orderTargetId = target.id;
           }
@@ -249,6 +244,7 @@ export class Match {
           this.cancelRecall(unit);
           cancelAttack(unit);
           stopMoving(unit);
+          champ.attackMovePoint = null;
           unit.attackTargetId = -1;
           break;
 
@@ -301,6 +297,34 @@ export class Match {
     this.pendingCommands = [];
   }
 
+  /**
+   * One step of a standing attack-move order: take whatever is in range, and
+   * otherwise keep walking to the ordered point. Called when the order is
+   * given and again whenever the current target dies.
+   */
+  private serviceAttackMove(unit: Unit): void {
+    const champ = unit.champion!;
+    const point = champ.attackMovePoint;
+    if (!point) return;
+
+    const found = acquireChampionTarget(this.world, unit, unit.stats.attackRange + 250);
+    if (found >= 0) {
+      unit.attackTargetId = found;
+      unit.orderTargetId = found;
+      return;
+    }
+
+    unit.attackTargetId = -1;
+    unit.orderTargetId = -1;
+    // Arrived with nothing to kill: the order is done.
+    if (distSq(unit.pos, point) < 160 * 160) {
+      champ.attackMovePoint = null;
+      stopMoving(unit);
+      return;
+    }
+    if (unit.path.length === 0) issueMove(unit, point);
+  }
+
   /** Keeps champions walking toward whatever they were ordered to attack. */
   private steerChampions(): void {
     for (const unit of this.champions) {
@@ -310,6 +334,8 @@ export class Match {
         if (unit.orderTargetId >= 0 && !this.world.living(unit.orderTargetId)) {
           unit.orderTargetId = -1;
         }
+        // A standing attack-move picks its next target the moment one dies.
+        if (unit.champion?.attackMovePoint) this.serviceAttackMove(unit);
         continue;
       }
       const reach = unit.stats.attackRange + target.radius;

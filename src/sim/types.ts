@@ -202,6 +202,12 @@ export interface ChampionState {
   damageDealt: number;
   damageTaken: number;
 
+  /**
+   * Destination of a standing attack-move order, or null. Keeping it lets the
+   * champion pick a new target the moment the current one dies, which is what
+   * makes farming with attack-move feel right.
+   */
+  attackMovePoint: Vec2 | null;
   /** Ticks of recall channel completed, or -1 when not recalling. */
   recallTicks: number;
   /** Summoner spell cooldowns in ticks. */

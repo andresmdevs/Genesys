@@ -82,7 +82,10 @@ export function runBots(match: Match): void {
     const situation = assess(match, unit);
     if (world.tick >= memory.commitUntil) {
       memory.state = decide(match, unit, memory, situation);
-      memory.commitUntil = world.tick + secToTicks(0.6);
+      // A siege has to be seen through; re-deciding twice a second means the
+      // turret never dies. Everything else stays reactive.
+      const sticky = memory.state === 'push' || memory.state === 'objective';
+      memory.commitUntil = world.tick + secToTicks(sticky ? 2.5 : 0.6);
     }
 
     act(match, unit, memory, situation);
@@ -182,7 +185,7 @@ function decide(match: Match, unit: Unit, memory: BotMemory, s: Situation): BotS
 
   // Mid game onwards bots group on structures, but they keep farming while
   // they wait. Fighting on sight at this point stalls the economy completely.
-  if (minutes > 11 && memory.state !== 'recall') return 'objective';
+  if (minutes > 9 && memory.state !== 'recall') return 'objective';
 
   const target = nextStructureInLane(match, unit.team as Team, champ.lane);
   if (target && s.alliedMinionsNear >= 2 && dist(unit.pos, target.pos) < 1400) return 'push';
@@ -359,7 +362,7 @@ function doPush(match: Match, unit: Unit, memory: BotMemory, s: Situation): void
   const minutes = match.world.seconds / 60;
 
   // Mid game onwards everyone converges on one lane so pushes are not solo.
-  const lane: LaneId = minutes > 11 ? teamPushLane(match, team) : champ.lane;
+  const lane: LaneId = minutes > 9 ? teamPushLane(match, team) : champ.lane;
   const structure = nextStructureInLane(match, team, lane);
 
   if (!structure) {
@@ -368,14 +371,21 @@ function doPush(match: Match, unit: Unit, memory: BotMemory, s: Situation): void
   }
 
   const d = dist(unit.pos, structure.pos);
-  if (s.enemies.length > 0 && shouldCommit(s)) {
+  const sieging = d <= structure.radius + unit.stats.attackRange + 150;
+  // Chasing a kill off a half-dead turret is how a team loses its push. Once
+  // the siege is under way only a threat in your face is worth answering.
+  const breakOffRange = sieging ? 800 : DANGER_RADIUS;
+  const threat = s.nearestEnemy && dist(unit.pos, s.nearestEnemy.pos) <= breakOffRange;
+  if (threat && shouldCommit(s)) {
     doFight(match, unit, memory, s);
     return;
   }
 
-  // Walking into a turret without a wave gets the bot shot for nothing. Farm
-  // the lane while waiting for one rather than standing in the open.
-  if (structure.kind === 'tower' && s.alliedMinionsNear < 2 && d < TOWER_RANGE * 1.3) {
+  // Walking into a turret alone gets the bot shot for nothing, so it farms
+  // while it waits. Three allies standing with it is enough to dive anyway,
+  // and without that exception a team never closes out a game.
+  const grouped = s.allies.length >= 3;
+  if (structure.kind === 'tower' && s.alliedMinionsNear < 2 && !grouped && d < TOWER_RANGE * 1.3) {
     doLane(match, unit, memory, s);
     return;
   }

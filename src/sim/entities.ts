@@ -229,7 +229,7 @@ export function spawnMinion(
  * ------------------------------------------------------------------ */
 
 const TOWER_STATS = {
-  outer: { maxHp: 4500, armor: 50, mr: 50, ad: 180 },
+  outer: { maxHp: 3900, armor: 45, mr: 45, ad: 180 },
   inner: { maxHp: 4800, armor: 55, mr: 55, ad: 190 },
   inhib: { maxHp: 5000, armor: 60, mr: 60, ad: 200 },
   nexus: { maxHp: 5200, armor: 65, mr: 65, ad: 210 },

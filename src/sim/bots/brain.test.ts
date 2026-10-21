@@ -45,7 +45,8 @@ describe('bot play', () => {
       // A game that ends in two minutes means structures are made of paper;
       // one that never ends means bots cannot close.
       expect(minutes).toBeGreaterThan(8);
-      expect(minutes).toBeLessThan(40);
+      // A game that drags past half an hour means bots cannot close.
+      expect(minutes).toBeLessThan(32);
 
       const champs = match.champions;
       // Bots must actually play: spend gold, rank abilities, take creeps.
@@ -56,7 +57,7 @@ describe('bot play', () => {
       const towersDown = [...match.world.units.values()].filter(
         (u) => u.kind === 'tower' && !u.alive,
       ).length;
-      expect(towersDown).toBeGreaterThanOrEqual(5);
+      expect(towersDown).toBeGreaterThanOrEqual(8);
     },
     { timeout: 180000 },
   );

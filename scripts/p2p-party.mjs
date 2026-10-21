@@ -83,22 +83,43 @@ for (let i = 0; i < 5; i++) {
 }
 await host.waitForTimeout(SECONDS * 1000);
 
-const fingerprint = (page) =>
+// Clients are never on the exact same tick at the instant you ask them, so
+// comparing "right now" would flag normal lockstep spread as a desync. Each
+// page records a fingerprint every tenth tick, and the check compares the
+// highest tick they all recorded - the same moment of simulation on each.
+const installRecorder = (page) =>
   page.evaluate(() => {
-    const w = window.genesys.match.world;
-    return {
-      tick: w.tick,
-      units: [...w.units.values()]
+    const match = window.genesys.match;
+    if (window.__history) return;
+    window.__history = {};
+    const original = match.step.bind(match);
+    match.step = (cmds) => {
+      original(cmds);
+      const tick = match.world.tick;
+      if (tick % 10 !== 0) return;
+      window.__history[tick] = [...match.world.units.values()]
         .map((u) => `${u.id}:${u.hp.toFixed(1)}:${u.pos.x.toFixed(1)}:${u.pos.y.toFixed(1)}`)
-        .join('|'),
+        .join('|');
+      const keys = Object.keys(window.__history);
+      if (keys.length > 60) delete window.__history[keys[0]];
     };
   });
 
-let prints = await Promise.all(pages.map(fingerprint));
-for (let i = 0; i < 50 && new Set(prints.map((p) => p.tick)).size > 1; i++) {
-  await host.waitForTimeout(250);
-  prints = await Promise.all(pages.map(fingerprint));
-}
+for (const page of pages) await installRecorder(page);
+await host.waitForTimeout(4000);
+
+const histories = await Promise.all(
+  pages.map((page) => page.evaluate(() => window.__history)),
+);
+const common = Object.keys(histories[0])
+  .filter((tick) => histories.every((h) => h[tick] !== undefined))
+  .map(Number)
+  .sort((a, b) => b - a);
+
+const prints = pages.map((_, i) => ({
+  tick: common[0],
+  units: common.length > 0 ? histories[i][String(common[0])] : `sin-datos-${i}`,
+}));
 
 const seated = await host.evaluate(() =>
   window.genesys.match.champions
@@ -110,14 +131,13 @@ const botCount = await host.evaluate(
   () => window.genesys.match.champions.filter((c) => c.champion.isBot).length,
 );
 
-console.log(`ticks: ${prints.map((p) => p.tick).join(', ')}`);
+console.log(`tick comparado: ${common[0]} (de ${common.length} comunes)`);
 console.log(`humanos: ${seated.join(' | ')}`);
 console.log(`bots: ${botCount}`);
 
 let failed = false;
-const ticks = new Set(prints.map((p) => p.tick));
-if (ticks.size > 1) {
-  console.error('FAIL: los clientes no convergieron al mismo tick');
+if (common.length === 0) {
+  console.error('FAIL: los clientes no compartieron ningún tick');
   failed = true;
 } else if (new Set(prints.map((p) => p.units)).size > 1) {
   console.error(`FAIL: desincronización en el tick ${prints[0].tick}`);

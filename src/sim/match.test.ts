@@ -113,7 +113,9 @@ describe('match simulation', () => {
     const match = new Match({ seed: 5, slots: tenSlots() });
     for (let i = 0; i < TICK_RATE * 150; i++) match.step();
     for (const champ of match.champions) {
-      expect(champ.champion!.gold).toBeGreaterThan(500);
+      // Lifetime earnings, not the purse: bots spend theirs in the shop.
+      expect(champ.champion!.totalGold).toBeGreaterThan(500);
+      expect(champ.champion!.gold).toBeGreaterThanOrEqual(0);
     }
     // Waves meeting in the middle must actually kill each other.
     const deadMinions = [...match.world.units.values()].filter(

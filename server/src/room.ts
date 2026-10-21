@@ -118,11 +118,17 @@ export class Room {
         if (this.started) return;
         const slot = Number(msg.slot);
         if (!Number.isInteger(slot) || slot < 0 || slot >= MAX_PLAYERS) return;
-        // A seat somebody already holds stays theirs; the asker keeps its own.
-        for (const other of this.sessions.values()) {
-          if (other !== session && other.joined && other.slot === slot) return;
-        }
+        // Somebody already sitting there trades places, so an auto-assigned
+        // seat can never block the player who actually wants it.
+        const occupant = [...this.sessions.values()].find(
+          (other) => other !== session && other.joined && other.slot === slot,
+        );
+        const previous = session.slot;
         session.slot = slot;
+        if (occupant) {
+          occupant.slot = previous;
+          this.send(occupant, { t: 'welcome', slot: previous, version: PROTOCOL_VERSION });
+        }
         // Tell the asker which seat is now theirs; without this their lobby
         // keeps highlighting the one they were first given.
         this.send(session, { t: 'welcome', slot, version: PROTOCOL_VERSION });

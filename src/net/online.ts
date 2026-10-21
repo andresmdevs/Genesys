@@ -345,8 +345,9 @@ export function onlineScreen(parent: HTMLElement, hooks: OnlineHooks): HTMLEleme
         seat.append(el('span', 'seat-champ', occupant ? (champName || 'eligiendo…') : ''));
         if (occupant?.ready) seat.classList.add('ready');
 
-        seat.title = POSITION_NAMES[position];
-        seat.disabled = Boolean(occupant) && slot !== mySlot;
+        seat.title = occupant && slot !== mySlot
+          ? `${POSITION_NAMES[position]} · tocar para intercambiar con ${occupant.name}`
+          : POSITION_NAMES[position];
         seat.addEventListener('click', () => {
           if (slot === mySlot) return;
           net?.claimSeat(slot);

@@ -1,3 +1,7 @@
+# Requires GitHub Actions to be available on the account. If runs fail with
+# "your account is locked due to a billing issue", the checks still run
+# locally with `npm test` and `npm run build`, and publishing the site does
+# not depend on Actions at all - see `npm run deploy`.
 name: CI
 
 on:

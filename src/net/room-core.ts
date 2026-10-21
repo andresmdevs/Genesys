@@ -125,11 +125,21 @@ export class RoomCore {
         if (this.started) return;
         const slot = Number(msg.slot);
         if (!Number.isInteger(slot) || slot < 0 || slot >= MAX_PLAYERS) return;
-        // A seat somebody already holds stays theirs.
-        for (const other of this.seats.values()) {
-          if (other !== seat && other.joined && other.slot === slot) return;
-        }
+        // Somebody already sitting there trades places, so an auto-assigned
+        // seat can never block the player who actually wants it.
+        const occupant = [...this.seats.values()].find(
+          (other) => other !== seat && other.joined && other.slot === slot,
+        );
+        const previous = seat.slot;
         seat.slot = slot;
+        if (occupant) {
+          occupant.slot = previous;
+          this.transport.send(occupant.peerId, {
+            t: 'welcome',
+            slot: previous,
+            version: PROTOCOL_VERSION,
+          });
+        }
         // Tell the asker which seat is now theirs; without this their lobby
         // keeps highlighting the one they were first given.
         this.transport.send(peerId, { t: 'welcome', slot, version: PROTOCOL_VERSION });

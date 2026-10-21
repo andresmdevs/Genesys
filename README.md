@@ -165,6 +165,10 @@ público. Para actualizarlo:
 npm run deploy
 ```
 
+Eso compila y empuja la rama, sin pasar por GitHub Actions: publicar es un
+`git push`, así que funciona aunque la cuenta tenga Actions deshabilitado.
+GitHub sirve la rama por su cuenta en un minuto.
+
 Si alojas el juego en la raíz de un dominio en vez de en `/Genesys/`, compila
 con `BASE_PATH=/ npm run build`.
 

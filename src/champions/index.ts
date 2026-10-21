@@ -1,18 +1,17 @@
-import type { ChampionDef } from './types.ts';
-import type { ChampionRole } from '../sim/types.ts';
+/**
+ * Champion barrel. Importing this module registers every champion, so any
+ * consumer that needs the roster only has to import from here.
+ */
 
-/** Populated by the champion modules; see `registerChampions`. */
-export const CHAMPIONS: ChampionDef[] = [];
+import './korvath.ts';
+import './mordrax.ts';
+import './vael.ts';
+import './nyx.ts';
+import './ysolde.ts';
+import './pyrrhen.ts';
+import './ryka.ts';
+import './thessa.ts';
+import './lumen.ts';
+import './grommar.ts';
 
-const byId = new Map<string, ChampionDef>();
-
-export function registerChampion(def: ChampionDef): ChampionDef {
-  CHAMPIONS.push(def);
-  byId.set(def.id, def);
-  return def;
-}
-
-export const getChampion = (id: string): ChampionDef | undefined => byId.get(id);
-
-export const championsByRole = (role: ChampionRole): ChampionDef[] =>
-  CHAMPIONS.filter((c) => c.role === role);
+export { CHAMPIONS, championsByRole, getChampion, registerChampion } from './registry.ts';
